@@ -1,0 +1,46 @@
+:root{
+  --bg:#0f1720;
+  --panel:#111217;
+  --muted:#98a0aa;
+  --accent:#2b6cff;
+  --card:#16191d;
+  --glass: rgba(255,255,255,0.03);
+}
+*{box-sizing:border-box;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;}
+body,html,#root{height:100%;margin:0;background:linear-gradient(180deg,#0b0f14 0%, #0f1720 100%);color:#dfe7ee}
+.container{max-width:1400px;margin:24px auto;background:transparent}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 18px}
+.logo{font-weight:700;letter-spacing:1px;color:linear-gradient(90deg,#f6a 0,#6ff 100%);font-size:20px}
+.topcenter{display:flex;align-items:center;gap:18px}
+.teambox{background:var(--card);padding:10px 14px;border-radius:8px;display:flex;align-items:center;gap:10px}
+.score{background:linear-gradient(90deg,#2b6cff,#6b34ff);padding:4px 8px;border-radius:8px;color:white;font-weight:700;margin-left:6px}
+.timer{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(90deg,#1f2937,#0b1220);font-weight:700}
+
+.profile{background:linear-gradient(90deg,#6b34ff,#2b6cff);padding:6px 10px;border-radius:16px;font-weight:700}
+
+.game-main{display:flex;gap:18px;padding:18px}
+.sidebar-left{width:170px;padding:8px;background:transparent}
+.player-item{padding:8px 10px;background:rgba(255,255,255,0.03);margin-bottom:8px;border-radius:8px}
+
+.board-area{flex:1;display:flex;flex-direction:column;gap:14px}
+.words-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;padding:12px;background:transparent}
+.word-card{background:var(--card);padding:14px;border-radius:8px;display:flex;flex-direction:column;justify-content:space-between;min-height:64px;opacity:0.9}
+.word-card.guessed{background:linear-gradient(90deg,#2b6cff,#6b34ff);color:white;box-shadow:0 6px 18px rgba(43,108,255,0.12)}
+.word{font-weight:700}
+.pts{font-size:12px;color:var(--muted);margin-top:8px}
+
+.contributions{background:var(--panel);padding:12px;border-radius:8px}
+.contrib-title{font-weight:700;margin-bottom:8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{background:rgba(255,255,255,0.04);padding:6px 8px;border-radius:6px;font-weight:700;font-size:12px}
+.chip.active{background:linear-gradient(90deg,#2b6cff,#6b34ff);color:white}
+
+.sidebar-right{width:86px;display:flex;align-items:flex-start;justify-content:center}
+.right-controls{display:flex;flex-direction:column;gap:10px}
+.icon{background:rgba(255,255,255,0.03);border:none;padding:10px;border-radius:8px;color:var(--muted)}
+.primary{background:linear-gradient(90deg,#2b6cff,#6b34ff);border:none;color:white;padding:10px 14px;border-radius:8px;font-weight:700}
+.card{background:var(--panel);padding:18px;border-radius:10px}
+.lobby{display:flex;gap:18px;padding:18px}
+.lobby-left{width:200px}
+.lobby-center{flex:1;display:flex;align-items:center;justify-content:center}
+.lobby-right{width:86px}
