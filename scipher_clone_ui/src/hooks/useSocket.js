@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import io from 'socket.io-client';
 
-const SERVER_URL = 'http://localhost:3000'; // Update for production
+const SERVER_URL = process.env.NODE_ENV === 'production'
+    ? 'https://scipher-backend-qzp2cix6x-voids-projects-705600c7.vercel.app'
+    : 'http://localhost:3000';
 
 export function useSocket() {
     const [socket, setSocket] = useState(null);

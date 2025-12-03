@@ -7,15 +7,15 @@ export function setupSocketHandlers(io) {
         console.log('User connected:', socket.id);
 
         // Create Room
-        socket.on('createRoom', ({ playerName }, callback) => {
-            const roomCode = gameManager.createRoom(playerName, socket.id);
+        socket.on('createRoom', async ({ playerName }, callback) => {
+            const roomCode = await gameManager.createRoom(playerName, socket.id);
             socket.join(roomCode);
             callback({ success: true, roomCode });
         });
 
         // Join Room
-        socket.on('joinRoom', ({ roomCode, playerName }, callback) => {
-            const room = gameManager.joinRoom(roomCode, playerName, socket.id);
+        socket.on('joinRoom', async ({ roomCode, playerName }, callback) => {
+            const room = await gameManager.joinRoom(roomCode, playerName, socket.id);
             if (room) {
                 socket.join(roomCode);
                 callback({ success: true, room: room });
@@ -25,20 +25,20 @@ export function setupSocketHandlers(io) {
         });
 
         // Start Game
-        socket.on('startGame', ({ roomCode }) => {
-            gameManager.startGame(roomCode);
+        socket.on('startGame', async ({ roomCode }) => {
+            await gameManager.startGame(roomCode);
         });
 
         // Submit Guess
-        socket.on('submitGuess', ({ roomCode, word, team }) => {
-            const success = gameManager.handleGuess(roomCode, word, team);
+        socket.on('submitGuess', async ({ roomCode, word, team }) => {
+            await gameManager.handleGuess(roomCode, word, team);
             // Optional: emit specific success/fail event back to guesser
         });
 
         // Disconnect
-        socket.on('disconnect', () => {
+        socket.on('disconnect', async () => {
             console.log('User disconnected:', socket.id);
-            gameManager.leaveRoom(socket.id);
+            await gameManager.leaveRoom(socket.id);
         });
     });
 }

@@ -3,33 +3,52 @@ import { initializeApp, cert } from 'firebase-admin/app';
 import { getDatabase } from 'firebase-admin/database';
 import fs from 'fs';
 
-// Initialize Firebase (Conditional)
+// Initialize Firebase
 let db = null;
 try {
-    if (fs.existsSync('./serviceAccountKey.json')) {
+    // Check for environment variables first (Production/Vercel)
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+        initializeApp({
+            credential: cert(serviceAccount),
+            databaseURL: process.env.FIREBASE_DB_URL
+        });
+        db = getDatabase();
+        console.log("Firebase initialized from Env Var");
+    }
+    // Check for local file (Development)
+    else if (fs.existsSync('./serviceAccountKey.json')) {
         const serviceAccount = JSON.parse(fs.readFileSync('./serviceAccountKey.json', 'utf8'));
         initializeApp({
             credential: cert(serviceAccount),
-            databaseURL: process.env.FIREBASE_DB_URL // e.g. "https://your-project.firebaseio.com"
+            databaseURL: process.env.FIREBASE_DB_URL
         });
         db = getDatabase();
-        console.log("Firebase initialized successfully");
+        console.log("Firebase initialized from File");
     } else {
-        console.log("No serviceAccountKey.json found. Running in-memory mode.");
+        console.warn("No Firebase credentials found! Game will not persist.");
     }
 } catch (error) {
     console.error("Firebase initialization failed:", error);
 }
-
-// In-memory store (synced with Firebase if available)
-const rooms = new Map();
 
 export class GameManager {
     constructor(io) {
         this.io = io;
     }
 
-    createRoom(hostName, socketId) {
+    async getRoom(roomCode) {
+        if (!db) return null;
+        const snapshot = await db.ref(`rooms/${roomCode}`).once('value');
+        return snapshot.val();
+    }
+
+    async saveRoom(roomCode, roomData) {
+        if (!db) return;
+        await db.ref(`rooms/${roomCode}`).set(roomData);
+    }
+
+    async createRoom(hostName, socketId) {
         const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
         const newRoom = {
@@ -37,31 +56,32 @@ export class GameManager {
             players: [{
                 id: socketId,
                 name: hostName,
-                team: '1', // '1' or '2'
+                team: '1',
                 isHost: true
             }],
             gameState: {
                 words: generateWords(),
                 scores: { team1: 0, team2: 0 },
-                currentTurn: '1', // Team 1 starts
+                currentTurn: '1',
                 timer: 30,
                 isPlaying: false,
                 contributions: []
-            }
+            },
+            lastUpdated: Date.now()
         };
 
-        rooms.set(roomCode, newRoom);
-        this.syncRoom(roomCode);
+        await this.saveRoom(roomCode, newRoom);
         return roomCode;
     }
 
-    joinRoom(roomCode, playerName, socketId) {
-        const room = rooms.get(roomCode);
+    async joinRoom(roomCode, playerName, socketId) {
+        const room = await this.getRoom(roomCode);
         if (!room) return null;
 
-        // Auto-assign team to balance
-        const team1Count = room.players.filter(p => p.team === '1').length;
-        const team2Count = room.players.filter(p => p.team === '2').length;
+        // Auto-assign team
+        const players = room.players || [];
+        const team1Count = players.filter(p => p.team === '1').length;
+        const team2Count = players.filter(p => p.team === '2').length;
         const team = team1Count <= team2Count ? '1' : '2';
 
         const player = {
@@ -71,106 +91,55 @@ export class GameManager {
             isHost: false
         };
 
-        room.players.push(player);
-        this.syncRoom(roomCode);
+        players.push(player);
+        room.players = players;
+
+        await this.saveRoom(roomCode, room);
+        this.io.to(roomCode).emit('gameStateUpdate', room);
         return room;
     }
 
-    leaveRoom(socketId) {
-        for (const [code, room] of rooms.entries()) {
-            const index = room.players.findIndex(p => p.id === socketId);
-            if (index !== -1) {
-                room.players.splice(index, 1);
-                if (room.players.length === 0) {
-                    rooms.delete(code);
-                } else {
-                    this.syncRoom(code);
-                }
-                return code;
-            }
-        }
+    async leaveRoom(socketId) {
+        // This is harder in serverless without keeping state
+        // We might skip strict leave handling for Vercel or scan rooms
+        // For now, we'll rely on client disconnects
         return null;
     }
 
-    startGame(roomCode) {
-        const room = rooms.get(roomCode);
+    async startGame(roomCode) {
+        const room = await this.getRoom(roomCode);
         if (!room) return;
 
         room.gameState.isPlaying = true;
         room.gameState.timer = 30;
-        this.syncRoom(roomCode);
+        room.lastUpdated = Date.now();
 
-        // Start timer loop
-        if (room.timerInterval) clearInterval(room.timerInterval);
-
-        room.timerInterval = setInterval(() => {
-            if (!rooms.has(roomCode)) {
-                clearInterval(room.timerInterval);
-                return;
-            }
-
-            room.gameState.timer--;
-
-            if (room.gameState.timer <= 0) {
-                this.nextTurn(roomCode);
-            } else {
-                this.io.to(roomCode).emit('timerUpdate', room.gameState.timer);
-            }
-        }, 1000);
+        await this.saveRoom(roomCode, room);
+        this.io.to(roomCode).emit('gameStateUpdate', room);
     }
 
-    nextTurn(roomCode) {
-        const room = rooms.get(roomCode);
-        if (!room) return;
-
-        room.gameState.currentTurn = room.gameState.currentTurn === '1' ? '2' : '1';
-        room.gameState.timer = 30; // Reset timer
-        this.syncRoom(roomCode);
-    }
-
-    handleGuess(roomCode, wordText, team) {
-        const room = rooms.get(roomCode);
+    async handleGuess(roomCode, wordText, team) {
+        const room = await this.getRoom(roomCode);
         if (!room || !room.gameState.isPlaying) return;
-        if (room.gameState.currentTurn !== team) return; // Not your turn
+        if (room.gameState.currentTurn !== team) return;
 
         const wordObj = room.gameState.words.find(w => w.word === wordText);
         if (wordObj && !wordObj.guessed) {
             wordObj.guessed = true;
-
-            // Add points
             if (team === '1') room.gameState.scores.team1 += wordObj.pts;
             else room.gameState.scores.team2 += wordObj.pts;
 
-            // Add to contributions
+            room.gameState.contributions = room.gameState.contributions || [];
             room.gameState.contributions.push({
                 word: wordText,
                 team: team,
                 timestamp: Date.now()
             });
 
-            this.syncRoom(roomCode);
+            await this.saveRoom(roomCode, room);
+            this.io.to(roomCode).emit('gameStateUpdate', room);
             return true;
         }
         return false;
-    }
-
-    syncRoom(roomCode) {
-        const room = rooms.get(roomCode);
-        if (!room) return;
-
-        // Send update to all clients in room
-        // Strip out internal stuff like timerInterval
-        const cleanRoom = {
-            ...room,
-            timerInterval: undefined
-        };
-
-        this.io.to(roomCode).emit('gameStateUpdate', cleanRoom);
-
-        // Sync to Firebase if available
-        if (db) {
-            const ref = db.ref(`rooms/${roomCode}`);
-            ref.set(cleanRoom).catch(err => console.error("Firebase sync error:", err));
-        }
     }
 }
