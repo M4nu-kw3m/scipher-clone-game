@@ -15,14 +15,25 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const httpServer = createServer(app);
 
-// CORS setup
-app.use(cors());
+// CORS setup - Allow Firebase Hosting
+const allowedOrigins = [
+    'https://scipher-game.web.app',
+    'https://scipher-game.firebaseapp.com',
+    'http://localhost:5173',
+    'http://localhost:5174'
+];
+
+app.use(cors({
+    origin: allowedOrigins,
+    credentials: true
+}));
 
 // Socket.IO setup
 const io = new Server(httpServer, {
     cors: {
-        origin: [process.env.CLIENT_URL || "http://localhost:5173", "http://localhost:5174"],
-        methods: ["GET", "POST"]
+        origin: allowedOrigins,
+        methods: ["GET", "POST"],
+        credentials: true
     }
 });
 
